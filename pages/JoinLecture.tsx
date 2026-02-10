@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Video, Mic, ArrowRight, VideoOff, Camera, Wifi } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
 
 const JoinLecture: React.FC = () => {
   const [emotionDetection, setEmotionDetection] = useState(true);
@@ -11,7 +12,7 @@ const JoinLecture: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
@@ -65,18 +66,34 @@ const JoinLecture: React.FC = () => {
   };
 
   const connectToSignalingServer = () => {
-      // Mocking WebSocket Connection
-      // In production: const ws = new WebSocket(`wss://api.jignasa.edu/ws/lecture/${id}`);
-      console.log(`Connecting to signaling server for Lecture ${id}...`);
+      // Connect to the Flask-SocketIO backend
+      // Assuming backend runs on port 5000 locally or relative path in production
+      const socket = io('http://localhost:5000', {
+          transports: ['websocket'],
+          query: {
+              role: 'student',
+              lecture_id: id
+          }
+      });
       
-      // Simulate successful connection
-      setTimeout(() => {
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+          console.log(`Connected to signaling server for Lecture ${id}`);
           setIsConnected(true);
-          console.log("WebSocket Connected. Session Active.");
-          
-          // Simulate WebRTC Offer/Answer exchange
-          // socketRef.current.send(JSON.stringify({ type: 'join_lecture', studentId: 'current_user_id' }));
-      }, 1000);
+          // Join the specific lecture room
+          socket.emit('join', { lecture_id: id, role: 'student' });
+      });
+
+      socket.on('disconnect', () => {
+          console.log("Disconnected from signaling server");
+          setIsConnected(false);
+      });
+
+      socket.on('connect_error', (err) => {
+          console.error("Socket connection error:", err);
+          setIsConnected(false);
+      });
   };
 
   const stopSession = () => {
@@ -88,7 +105,7 @@ const JoinLecture: React.FC = () => {
     
     // Close WebSocket
     if (socketRef.current) {
-        socketRef.current.close();
+        socketRef.current.disconnect();
         socketRef.current = null;
     }
 
@@ -103,7 +120,7 @@ const JoinLecture: React.FC = () => {
   };
 
   const captureAndSendFrame = async () => {
-      if (videoRef.current && canvasRef.current && isCameraActive) {
+      if (videoRef.current && canvasRef.current && isCameraActive && isConnected) {
           const video = videoRef.current;
           const canvas = canvasRef.current;
           
@@ -121,18 +138,21 @@ const JoinLecture: React.FC = () => {
                   
                   try {
                       // Send to backend API for analysis
-                      // Note: In a full WebRTC setup, emotion analysis might happen on the media server frame
-                      // Here we treat it as a separate metadata stream.
-                      await fetch('/api/emotion/analyze', {
+                      const response = await fetch('http://localhost:5000/api/emotion/analyze', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                               lectureId: id,
+                              studentId: 1, // Hardcoded for demo, normally from auth context
                               timestamp: new Date().toISOString(),
                               image: frameData // Base64 string
                           })
                       });
-                      // console.log("Frame sent for emotion analysis");
+                      
+                      const result = await response.json();
+                      
+                      // Optionally, emit the result via socket if needed for immediate peer updates
+                      // socketRef.current?.emit('emotion_update', result);
                   } catch (error) {
                       console.error("Failed to send frame:", error);
                   }

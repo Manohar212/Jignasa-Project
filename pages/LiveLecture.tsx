@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Square, Mic, Video, Users, AlertTriangle, Smile, Frown, Meh, VideoOff, Activity } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { io, Socket } from 'socket.io-client';
 
 interface StudentStream {
     id: number;
@@ -12,6 +13,7 @@ interface StudentStream {
 const LiveLecture: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
   const [timer, setTimer] = useState(0);
+  const socketRef = useRef<Socket | null>(null);
   
   // Real-time Analytics State
   const [moodData, setMoodData] = useState([
@@ -29,7 +31,7 @@ const LiveLecture: React.FC = () => {
   const [alertDetails, setAlertDetails] = useState<string | null>(null);
   const [alertRecommendation, setAlertRecommendation] = useState<string | null>(null);
 
-  // Mock Student Streams
+  // Mock Student Streams (will be updated via socket)
   const [studentStreams, setStudentStreams] = useState<StudentStream[]>([
       { id: 1, name: "Student 1", emotion: "Focused", isActive: true },
       { id: 2, name: "Student 2", emotion: "Confused", isActive: true },
@@ -52,81 +54,64 @@ const LiveLecture: React.FC = () => {
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // Real-time Data Polling (Simulated)
+  // Real-time Data Connection
   useEffect(() => {
-    let pollingInterval: any;
+    // Initialize Socket
+    const socket = io('http://localhost:5000', {
+        transports: ['websocket'],
+        query: {
+            role: 'faculty',
+            lecture_id: '1' // Hardcoded ID for demo
+        }
+    });
+    socketRef.current = socket;
 
-    const updateAnalytics = () => {
-        // Simulate data fluctuations
-        const rand = Math.random();
-        let confused = 15;
-        let distracted = 10;
-        let focused = 60;
-        let bored = 15;
+    socket.on('connect', () => {
+        console.log("Faculty Connected to Live Session");
+        socket.emit('join', { lecture_id: '1', role: 'faculty' });
+    });
 
-        // Create engagement events for demo
-        if (rand > 0.7) {
-            // Critical Event
-            confused = 35;
-            focused = 40;
-            bored = 15;
-            distracted = 10;
-        } else if (rand > 0.4) {
-            // Warning Event
-            confused = 25;
-            focused = 50;
-            bored = 15;
-            distracted = 10;
+    // Listen for live analytics broadcast
+    socket.on('live_analytics_update', (data: any) => {
+        console.log("Received update:", data);
+        
+        if (data.distribution) {
+             setMoodData([
+                { name: 'Focused', value: data.distribution.focused, color: '#74B783' },
+                { name: 'Confused', value: data.distribution.confused, color: '#88AED0' },
+                { name: 'Bored', value: data.distribution.bored, color: '#C0C0C0' },
+                { name: 'Distracted', value: data.distribution.distracted, color: '#E8A89A' },
+            ]);
         }
 
-        // Update Mood Data
-        setMoodData([
-            { name: 'Focused', value: focused, color: '#74B783' },
-            { name: 'Confused', value: confused, color: '#88AED0' },
-            { name: 'Bored', value: bored, color: '#C0C0C0' },
-            { name: 'Distracted', value: distracted, color: '#E8A89A' },
-        ]);
+        if (data.engagementScore) {
+            setEngagementLevel(data.engagementScore);
+        }
 
-        // Calculate Engagement Score
-        const score = focused + (confused * 0.5) + (bored * 0.2);
-        setEngagementLevel(Math.round(score));
-
-        // --- Alert Logic ---
-        if (confused > 30) {
-            setHasAlert(true);
-            setAlertSeverity('CRITICAL');
-            setAlertTitle("Critical Attention Drop Detected");
-            setAlertDetails(`${confused}% of students are showing confusion in the last 2 minutes`);
-            setAlertRecommendation("Recommended: Pause and Review Concept");
-        } else if (confused > 20 || distracted > 15) {
-            setHasAlert(true);
-            setAlertSeverity('WARNING');
-            setAlertTitle("Engagement Warning");
-            setAlertDetails("Subtle drop in attention detected across the classroom.");
-            setAlertRecommendation("Recommended: Ask a question to re-engage.");
+        // Handle Alerts from backend
+        if (data.alert) {
+             setHasAlert(true);
+             setAlertSeverity(data.alert.level);
+             setAlertTitle(data.alert.title);
+             setAlertDetails(data.alert.message);
+             setAlertRecommendation(data.alert.recommendation);
         } else {
-            setHasAlert(false);
-            setAlertTitle(null);
-            setAlertDetails(null);
-            setAlertRecommendation(null);
+             setHasAlert(false);
         }
+    });
 
-        // Randomize Student Thumbnails
-        setStudentStreams(prev => prev.map(s => ({
-            ...s,
-            emotion: Math.random() > 0.6 ? ['Focused', 'Confused', 'Bored', 'Distracted'][Math.floor(Math.random()*4)] as any : s.emotion
-        })));
-    };
-
-    if (isActive) {
-        pollingInterval = setInterval(updateAnalytics, 3000);
-        updateAnalytics(); // Initial
-    }
+    // Listen for individual student updates
+    socket.on('student_joined', (student: any) => {
+        setStudentStreams(prev => {
+            if (prev.find(s => s.id === student.id)) return prev;
+            return [...prev, { ...student, isActive: true }];
+        });
+    });
 
     return () => {
-        if (pollingInterval) clearInterval(pollingInterval);
+        socket.disconnect();
     };
-  }, [isActive]);
+  }, []);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
