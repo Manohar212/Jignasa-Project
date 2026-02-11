@@ -80,6 +80,54 @@ def analyze_emotion():
 
     return jsonify({"status": "success", "emotion": detected_emotion})
 
+# --- Polling Endpoints for Dashboard ---
+
+@app.route('/api/emotion/live-summary', methods=['GET'])
+def get_live_summary():
+    # Mock aggregation for demo
+    # In production: Query `emotion_logs` for last 30 seconds
+    distribution = {
+        'focused': random.randint(20, 80),
+        'confused': random.randint(5, 40),
+        'bored': random.randint(5, 40),
+        'distracted': random.randint(0, 20)
+    }
+    
+    # Normalize to 100%
+    total = sum(distribution.values())
+    if total > 0:
+        for k in distribution:
+            distribution[k] = round((distribution[k] / total) * 100)
+    
+    # Force sum to 100
+    current_sum = sum(distribution.values())
+    distribution['focused'] += (100 - current_sum)
+
+    # Calculate weighted engagement score
+    engagement_score = distribution['focused'] + (distribution['confused'] * 0.2) + (distribution['bored'] * 0.1)
+    
+    return jsonify({
+        "distribution": distribution,
+        "engagementScore": round(engagement_score)
+    })
+
+@app.route('/api/emotion/student-status', methods=['GET'])
+def get_student_status():
+    # Mock individual student statuses
+    # In production: Query latest status per student_id
+    students = []
+    emotions = ['Focused', 'Confused', 'Bored', 'Distracted']
+    
+    # Mocking for IDs 1-8 based on frontend hardcoded list
+    for i in range(1, 9):
+        # Weighted random choice to simulate realistic classroom
+        emotion = random.choices(emotions, weights=[0.5, 0.2, 0.2, 0.1])[0]
+        students.append({
+            "id": i,
+            "emotion": emotion
+        })
+    return jsonify(students)
+
 # --- WebSocket Events ---
 @socketio.on('join')
 def on_join(data):

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, Mic, Video, Users, AlertTriangle, Smile, Frown, Meh, VideoOff, Activity } from 'lucide-react';
+import { Play, Pause, Square, Mic, Video, Users, AlertTriangle, Smile, Frown, Meh, VideoOff, Activity, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { io, Socket } from 'socket.io-client';
 
@@ -25,13 +25,13 @@ const LiveLecture: React.FC = () => {
   const [engagementLevel, setEngagementLevel] = useState(75);
   
   // Alert State
-  const [hasAlert, setHasAlert] = useState(false);
-  const [alertSeverity, setAlertSeverity] = useState<'CRITICAL' | 'WARNING'>('WARNING');
-  const [alertTitle, setAlertTitle] = useState<string | null>(null);
-  const [alertDetails, setAlertDetails] = useState<string | null>(null);
-  const [alertRecommendation, setAlertRecommendation] = useState<string | null>(null);
+  const [hasAlert, setHasAlert] = useState(true);
+  const [alertSeverity, setAlertSeverity] = useState<'CRITICAL' | 'WARNING' | 'SUCCESS'>('CRITICAL');
+  const [alertTitle, setAlertTitle] = useState<string | null>("Critical Attention Drop");
+  const [alertDetails, setAlertDetails] = useState<string | null>("15% of students are showing signs of confusion in the last 2 minutes.");
+  const [alertRecommendation, setAlertRecommendation] = useState<string | null>("Recommended: Pause and Review Concept.");
 
-  // Mock Student Streams (will be updated via socket)
+  // Mock Student Streams (will be updated via polling)
   const [studentStreams, setStudentStreams] = useState<StudentStream[]>([
       { id: 1, name: "Student 1", emotion: "Focused", isActive: true },
       { id: 2, name: "Student 2", emotion: "Confused", isActive: true },
@@ -54,9 +54,76 @@ const LiveLecture: React.FC = () => {
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // Real-time Data Connection
+  // Polling for Real-Time Analytics & Alert Logic (Every 5 seconds)
   useEffect(() => {
-    // Initialize Socket
+    if (!isActive) return;
+
+    const fetchAnalytics = async () => {
+        try {
+            // 1. Fetch Live Summary
+            const summaryRes = await fetch('/api/emotion/live-summary');
+            if (summaryRes.ok) {
+                const data = await summaryRes.json();
+                
+                // Update Mood Distribution
+                setMoodData([
+                    { name: 'Focused', value: data.distribution.focused, color: '#74B783' },
+                    { name: 'Confused', value: data.distribution.confused, color: '#88AED0' },
+                    { name: 'Bored', value: data.distribution.bored, color: '#C0C0C0' },
+                    { name: 'Distracted', value: data.distribution.distracted, color: '#E8A89A' },
+                ]);
+
+                setEngagementLevel(data.engagementScore);
+
+                // Dynamic Alert Logic
+                const { confused, bored, focused } = data.distribution;
+
+                if (confused > 25) {
+                    setHasAlert(true);
+                    setAlertSeverity('CRITICAL');
+                    setAlertTitle("Critical Attention Drop");
+                    setAlertDetails(`${confused}% of students are showing signs of confusion.`);
+                    setAlertRecommendation("Recommended: Pause and Review Concept.");
+                } else if (bored > 30) {
+                    setHasAlert(true);
+                    setAlertSeverity('WARNING');
+                    setAlertTitle("Low Engagement Alert");
+                    setAlertDetails("Students appear to be losing interest.");
+                    setAlertRecommendation("Recommended: Ask a question or change pace.");
+                } else if (focused > 65) {
+                    setHasAlert(true);
+                    setAlertSeverity('SUCCESS');
+                    setAlertTitle("High Engagement");
+                    setAlertDetails("Classroom focus is excellent right now.");
+                    setAlertRecommendation("Great job! Keep the momentum going.");
+                } else {
+                    setHasAlert(false);
+                }
+            }
+
+            // 2. Fetch Student Statuses
+            const statusRes = await fetch('/api/emotion/student-status');
+            if (statusRes.ok) {
+                const students = await statusRes.json();
+                setStudentStreams(prev => prev.map(stream => {
+                    const update = students.find((s: any) => s.id === stream.id);
+                    return update ? { ...stream, emotion: update.emotion } : stream;
+                }));
+            }
+
+        } catch (error) {
+            console.error("Polling error:", error);
+        }
+    };
+
+    const interval = setInterval(fetchAnalytics, 5000);
+    fetchAnalytics(); // Initial call
+
+    return () => clearInterval(interval);
+  }, [isActive]);
+
+  // Socket Connection (For joining room / immediate events)
+  useEffect(() => {
     const socket = io('http://localhost:5000', {
         transports: ['websocket'],
         query: {
@@ -71,36 +138,12 @@ const LiveLecture: React.FC = () => {
         socket.emit('join', { lecture_id: '1', role: 'faculty' });
     });
 
-    // Listen for live analytics broadcast
+    // We keep the socket listener, though polling overwrites it periodically.
+    // This allows for future immediate events (like "Hand Raise") if implemented.
     socket.on('live_analytics_update', (data: any) => {
-        console.log("Received update:", data);
-        
-        if (data.distribution) {
-             setMoodData([
-                { name: 'Focused', value: data.distribution.focused, color: '#74B783' },
-                { name: 'Confused', value: data.distribution.confused, color: '#88AED0' },
-                { name: 'Bored', value: data.distribution.bored, color: '#C0C0C0' },
-                { name: 'Distracted', value: data.distribution.distracted, color: '#E8A89A' },
-            ]);
-        }
-
-        if (data.engagementScore) {
-            setEngagementLevel(data.engagementScore);
-        }
-
-        // Handle Alerts from backend
-        if (data.alert) {
-             setHasAlert(true);
-             setAlertSeverity(data.alert.level);
-             setAlertTitle(data.alert.title);
-             setAlertDetails(data.alert.message);
-             setAlertRecommendation(data.alert.recommendation);
-        } else {
-             setHasAlert(false);
-        }
+        // Optional: Can update state here for immediate feedback between polls
     });
 
-    // Listen for individual student updates
     socket.on('student_joined', (student: any) => {
         setStudentStreams(prev => {
             if (prev.find(s => s.id === student.id)) return prev;
@@ -127,6 +170,54 @@ const LiveLecture: React.FC = () => {
           case 'Distracted': return 'bg-red-100 text-red-700';
           default: return 'bg-gray-100 text-gray-700';
       }
+  };
+
+  const getAlertStyles = () => {
+      switch(alertSeverity) {
+          case 'CRITICAL':
+              return 'bg-red-50/50 border-red-100 border-t-red-500';
+          case 'WARNING':
+              return 'bg-orange-50/50 border-orange-100 border-t-orange-500';
+          case 'SUCCESS':
+              return 'bg-green-50/50 border-green-100 border-t-green-500';
+          default:
+              return 'bg-gray-50 border-gray-200';
+      }
+  };
+
+  const getAlertIcon = () => {
+      switch(alertSeverity) {
+          case 'CRITICAL':
+              return <AlertTriangle className="w-5 h-5" />;
+          case 'WARNING':
+              return <Activity className="w-5 h-5" />;
+          case 'SUCCESS':
+              return <CheckCircle className="w-5 h-5" />;
+      }
+  };
+
+  const getAlertTextColor = () => {
+    switch(alertSeverity) {
+        case 'CRITICAL': return 'text-red-800';
+        case 'WARNING': return 'text-orange-800';
+        case 'SUCCESS': return 'text-green-800';
+    }
+  };
+
+  const getAlertBadgeColor = () => {
+    switch(alertSeverity) {
+        case 'CRITICAL': return 'bg-red-100 text-red-700';
+        case 'WARNING': return 'bg-orange-100 text-orange-700';
+        case 'SUCCESS': return 'bg-green-100 text-green-700';
+    }
+  };
+
+  const getAlertIconBg = () => {
+    switch(alertSeverity) {
+        case 'CRITICAL': return 'bg-red-100 text-red-600';
+        case 'WARNING': return 'bg-orange-100 text-orange-600';
+        case 'SUCCESS': return 'bg-green-100 text-green-600';
+    }
   };
 
   return (
@@ -173,7 +264,7 @@ const LiveLecture: React.FC = () => {
                         {/* Overlay: Live Emotion Tag */}
                         {student.isActive && isActive && (
                             <div className="absolute top-2 right-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${getEmotionColor(student.emotion)}`}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm transition-colors duration-300 ${getEmotionColor(student.emotion)}`}>
                                     {student.emotion}
                                 </span>
                             </div>
@@ -257,19 +348,19 @@ const LiveLecture: React.FC = () => {
 
         {/* Engagement Alert Banner */}
         {hasAlert && (
-            <div className={`mb-auto p-4 rounded-xl border border-l-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 ${alertSeverity === 'CRITICAL' ? 'bg-red-50/50 border-red-100 border-l-red-500' : 'bg-orange-50/50 border-orange-100 border-l-orange-500'}`}>
+            <div className={`mb-auto p-4 rounded-xl border border-t-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 ${getAlertStyles()}`}>
                 <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-full shrink-0 ${alertSeverity === 'CRITICAL' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
-                        <AlertTriangle className="w-5 h-5" />
+                    <div className={`p-2 rounded-full shrink-0 ${getAlertIconBg()}`}>
+                        {getAlertIcon()}
                     </div>
                     <div>
-                        <h4 className={`font-bold text-sm mb-1 ${alertSeverity === 'CRITICAL' ? 'text-red-800' : 'text-orange-800'}`}>
+                        <h4 className={`font-bold text-sm mb-1 ${getAlertTextColor()}`}>
                             {alertTitle}
                         </h4>
                         <p className="text-xs text-gray-700 mb-3 leading-relaxed">
                             {alertDetails}
                         </p>
-                        <div className={`text-xs font-bold px-2 py-1 rounded inline-block ${alertSeverity === 'CRITICAL' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                        <div className={`text-xs font-bold px-2 py-1 rounded inline-block ${getAlertBadgeColor()}`}>
                             {alertRecommendation}
                         </div>
                     </div>
