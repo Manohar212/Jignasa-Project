@@ -1,8 +1,10 @@
-import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, Smile, Frown, Meh, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { Calendar, Smile, Frown, Meh, AlertCircle, X } from 'lucide-react';
 
 const StudentStatistics: React.FC = () => {
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
   const moodData = [
     { name: 'Focused', value: 60, color: '#74B783' }, // Greenish
     { name: 'Confused', value: 20, color: '#88AED0' }, // Bluish
@@ -15,6 +17,11 @@ const StudentStatistics: React.FC = () => {
     { name: 'Introduction to Cloud Computing', att: 92, mood: 'Confused', date: 'Oct 12, 2023', color: 'blue' },
     { name: 'Software Engineering Principles', att: 75, mood: 'Bored', date: 'Oct 10, 2023', color: 'gray' },
     { name: 'Discrete Mathematics', att: 100, mood: 'Focused', date: 'Oct 08, 2023', color: 'green' },
+  ];
+
+  const additionalHistory = [
+    { name: 'Database Systems', att: 85, mood: 'Focused', date: 'Oct 05, 2023', color: 'green' },
+    { name: 'Operating Systems', att: 60, mood: 'Bored', date: 'Oct 02, 2023', color: 'gray' }
   ];
 
   const getMoodIcon = (mood: string) => {
@@ -104,53 +111,134 @@ const StudentStatistics: React.FC = () => {
         </div>
       </div>
 
-      {/* History Table */}
+      {/* Responsive History Table Block */}
       <div>
          <div className="flex items-center gap-2 text-[#1B3B6F] font-bold mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
             <h3>Lecture History</h3>
          </div>
          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="w-full text-left">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Lecture Name</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Attendance %</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Dominant Mood</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Date</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {history.map((row) => (
-                        <tr key={row.name} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-gray-900">{row.name}</td>
-                            <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="font-bold text-gray-900 w-8">{row.att}%</span>
-                                    <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full ${row.att >= 90 ? 'bg-green-500' : row.att >= 75 ? 'bg-yellow-400' : 'bg-red-500'}`} 
-                                            style={{ width: `${row.att}%` }}
-                                        ></div>
-                                    </div>
+            
+            {/* Table Header - Hidden on Mobile */}
+            <div className="hidden md:grid grid-cols-4 bg-gray-50 border-b border-gray-100 p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <div className="px-2">Lecture Name</div>
+                <div className="px-2">Attendance %</div>
+                <div className="px-2">Dominant Mood</div>
+                <div className="px-2 text-right">Date</div>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+                {history.map((row) => (
+                    <div key={row.name} className="p-4 md:grid md:grid-cols-4 md:items-center hover:bg-gray-50 transition-colors">
+                        
+                        {/* Name */}
+                        <div className="mb-2 md:mb-0 px-2 font-bold text-gray-900">{row.name}</div>
+                        
+                        {/* Attendance */}
+                        <div className="mb-2 md:mb-0 px-2 flex items-center justify-between md:justify-start gap-3">
+                            <span className="md:hidden text-xs font-bold text-gray-400 uppercase">Attendance</span>
+                            <div className="flex items-center gap-3 flex-1 md:flex-none">
+                                <span className="font-bold text-gray-900 w-8">{row.att}%</span>
+                                <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full rounded-full ${row.att >= 90 ? 'bg-green-500' : row.att >= 75 ? 'bg-yellow-400' : 'bg-red-500'}`} 
+                                        style={{ width: `${row.att}%` }}
+                                    ></div>
                                 </div>
-                            </td>
-                            <td className="px-6 py-4">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${getMoodColor(row.mood)}`}>
-                                    {getMoodIcon(row.mood)}
-                                    {row.mood}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-400 font-serif italic text-right">{row.date}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            <button className="w-full py-3 text-sm font-bold text-[#1B3B6F] hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                            </div>
+                        </div>
+
+                        {/* Mood */}
+                        <div className="mb-2 md:mb-0 px-2 flex items-center justify-between md:justify-start">
+                            <span className="md:hidden text-xs font-bold text-gray-400 uppercase">Dominant Mood</span>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${getMoodColor(row.mood)}`}>
+                                {getMoodIcon(row.mood)}
+                                {row.mood}
+                            </span>
+                        </div>
+
+                        {/* Date */}
+                        <div className="px-2 text-right flex items-center justify-between md:justify-end">
+                             <span className="md:hidden text-xs font-bold text-gray-400 uppercase">Date</span>
+                             <span className="text-sm text-gray-400 font-serif italic">{row.date}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <button 
+                onClick={() => setShowHistoryModal(true)}
+                className="w-full py-3 text-sm font-bold text-[#1B3B6F] hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+            >
                 Load more history <span className="text-lg">↓</span>
             </button>
          </div>
       </div>
+
+      {/* History Popup Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div 
+                className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                        <h2 className="text-xl font-serif font-bold text-gray-900">Lecture History Archive</h2>
+                        <p className="text-xs text-gray-500 font-serif italic">Older records from this semester</p>
+                    </div>
+                    <button 
+                        onClick={() => setShowHistoryModal(false)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                <div className="p-0 max-h-[60vh] overflow-y-auto">
+                    {additionalHistory.map((row, idx) => (
+                         <div key={idx} className="p-6 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="font-bold text-gray-900 text-lg">{row.name}</h3>
+                                    <p className="text-sm text-gray-500 font-serif italic">{row.date}</p>
+                                </div>
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${getMoodColor(row.mood)}`}>
+                                    {getMoodIcon(row.mood)}
+                                    {row.mood}
+                                </span>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs font-bold text-gray-500">
+                                    <span>Attendance Score</span>
+                                    <span>{row.att}%</span>
+                                </div>
+                                <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full rounded-full ${row.att >= 90 ? 'bg-green-500' : row.att >= 75 ? 'bg-yellow-400' : 'bg-red-500'}`} 
+                                        style={{ width: `${row.att}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                <div className="p-4 bg-gray-50/50 border-t border-gray-100 flex justify-end">
+                     <button 
+                        onClick={() => setShowHistoryModal(false)} 
+                        className="px-6 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+            
+            {/* Backdrop Click to Close */}
+            <div className="absolute inset-0 -z-10" onClick={() => setShowHistoryModal(false)}></div>
+        </div>
+      )}
     </div>
   );
 };

@@ -181,11 +181,6 @@ const FacultyDashboard: React.FC = () => {
     }
   };
 
-  const handleExportLectures = () => {
-    window.open('/api/lectures/export', '_blank');
-    alert("Downloading lecture_schedule_export.xlsx...");
-  };
-
   // -- Backend Integration Logic: Students --
   const fetchStudentList = async () => {
     setIsLoading(true);
@@ -236,11 +231,6 @@ const FacultyDashboard: React.FC = () => {
     }
   };
 
-  const handleExportStudents = () => {
-    window.open('/api/students/export', '_blank');
-    alert("Downloading student_data_export.xlsx...");
-  };
-
   // -- Backend Integration Logic: Attendance --
   const fetchAttendanceReport = async () => {
     setIsLoading(true);
@@ -263,11 +253,6 @@ const FacultyDashboard: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  };
-
-  const handleDownloadAttendance = () => {
-    window.open('/api/attendance/export', '_blank');
-    alert("Downloading attendance_report.xlsx...");
   };
 
   const handleSaveAttendanceSettings = async () => {
@@ -384,9 +369,7 @@ const FacultyDashboard: React.FC = () => {
             case 1: // Add
                 setShowAddModal(true);
                 break;
-            case 2: // Export
-                handleExportLectures();
-                break;
+            // Removed Export Case
         }
     } else if (cardId === 2) { // Total Students Card
         switch(actionIndex) {
@@ -397,35 +380,13 @@ const FacultyDashboard: React.FC = () => {
             case 1: // Add Students
                 setShowAddStudentModal(true);
                 break;
-            case 2: // Export Student Data
-                handleExportStudents();
-                break;
+            // Removed Export Case
         }
     } else if (cardId === 3) { // Avg Attendance Card
         switch(actionIndex) {
             case 0: // View Report
                 fetchAttendanceReport();
                 setShowAttendanceReportModal(true);
-                break;
-            case 1: // Download
-                handleDownloadAttendance();
-                break;
-            case 2: // Settings
-                setShowAttendanceSettingsModal(true);
-                break;
-        }
-    } else if (cardId === 4) { // Engagement Card
-        switch(actionIndex) {
-            case 0: // View Engagement Analytics
-                fetchEngagementAnalytics();
-                setShowEngagementAnalyticsModal(true);
-                break;
-            case 1: // Compare Weekly Trends
-                fetchWeeklyTrends();
-                setShowWeeklyTrendsModal(true);
-                break;
-            case 2: // Engagement Settings
-                setShowEngagementSettingsModal(true);
                 break;
         }
     }
@@ -444,7 +405,7 @@ const FacultyDashboard: React.FC = () => {
       label: "Lectures Today",
       icon: <BookOpen className="w-6 h-6" />,
       style: "bg-blue-50 text-[#1B3B6F]",
-      menuOptions: ["View Today’s Schedule", "Add New Lecture", "Export Lecture List"]
+      menuOptions: ["View Today’s Schedule", "Add New Lecture"]
     },
     {
       id: 2,
@@ -452,7 +413,7 @@ const FacultyDashboard: React.FC = () => {
       label: "Total Students",
       icon: <Users className="w-6 h-6" />,
       style: "bg-green-50 text-green-700",
-      menuOptions: ["View Student List", "Add Students", "Export Student Data"]
+      menuOptions: ["View Student List", "Add Students"]
     },
     {
       id: 3,
@@ -460,15 +421,7 @@ const FacultyDashboard: React.FC = () => {
       label: "Avg. Attendance",
       icon: <BarChart2 className="w-6 h-6" />,
       style: "bg-purple-50 text-purple-700",
-      menuOptions: ["View Attendance Report", "Download Attendance", "Attendance Settings"]
-    },
-    {
-      id: 4,
-      value: "High",
-      label: "Engagement Level",
-      icon: <Activity className="w-6 h-6" />,
-      style: "bg-orange-50 text-orange-700",
-      menuOptions: ["View Engagement Analytics", "Compare Weekly Trends", "Engagement Settings"]
+      menuOptions: ["View Attendance Report"]
     }
   ];
 
@@ -480,7 +433,7 @@ const FacultyDashboard: React.FC = () => {
         <p className="text-gray-500 font-serif italic">Here's the summary of your classes and student engagement today.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {statCards.map((card) => (
             <div key={card.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative">
                 <div className="flex justify-between items-start mb-4">
@@ -526,7 +479,6 @@ const FacultyDashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-bold text-gray-900">Active Groups</h3>
-                <button className="text-sm text-[#1B3B6F] font-bold hover:underline">View All</button>
             </div>
             <table className="w-full text-left">
                 <thead className="bg-gray-50">
@@ -925,8 +877,7 @@ const FacultyDashboard: React.FC = () => {
                     </table>
                     )}
                 </div>
-                <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                    <button onClick={handleDownloadAttendance} className="flex items-center gap-2 text-[#1B3B6F] font-bold text-sm hover:underline"><Download className="w-4 h-4" /> Download</button>
+                <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
                     <button onClick={() => setShowAttendanceReportModal(false)} className="px-6 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50">Close</button>
                 </div>
             </div>

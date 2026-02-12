@@ -86,7 +86,7 @@ const FacultyGroups: React.FC = () => {
             ]);
         }
 
-        // Fetch Lectures
+        // Fetch Lectures (Even if not shown in this specific modal version, might be needed later or for caching)
         const lecturesRes = await fetch(`/api/groups/${group.id}/lectures`);
         if (lecturesRes.ok) {
             setGroupLectures(await lecturesRes.json());
@@ -125,7 +125,6 @@ const FacultyGroups: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 mb-8">
         <h1 className="text-4xl font-serif font-bold text-[#1B3B6F]">Manage Groups</h1>
         <div className="flex items-center gap-4">
-             <span className="text-sm text-gray-500 italic font-serif">Total: {groups.length} Active Groups</span>
              <button 
                 onClick={() => setShowCreateModal(true)}
                 className="px-5 py-2.5 bg-[#2C4C88] text-white rounded-lg font-bold flex items-center gap-2 hover:bg-[#1B3B6F] shadow-sm transition-colors"
@@ -264,103 +263,51 @@ const FacultyGroups: React.FC = () => {
                              <p>Loading details...</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            
-                            {/* Students Column */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                        <Users className="w-5 h-5 text-[#1B3B6F]" /> 
-                                        Enrolled Students
-                                    </h3>
-                                    <div className="relative">
-                                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                        <input type="text" placeholder="Search..." className="pl-9 pr-4 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-blue-500" />
-                                    </div>
+                        <div className="w-full h-full flex flex-col">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-lg">
+                                    <Users className="w-5 h-5 text-[#1B3B6F]" /> 
+                                    Enrolled Students
+                                </h3>
+                                <div className="relative w-full sm:w-72">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search by name or roll no..." 
+                                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-500 bg-gray-50 focus:bg-white transition-all" 
+                                    />
                                 </div>
-                                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                    <div className="max-h-80 overflow-y-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-gray-50 border-b border-gray-100 sticky top-0">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase">Name</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase">Roll No</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase">Email</th>
+                            </div>
+
+                            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex-1">
+                                <div className="overflow-x-auto h-full">
+                                    <table className="w-full text-left min-w-[600px] sm:min-w-full">
+                                        <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Name</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Roll Number</th>
+                                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Email</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {groupStudents.map((student) => (
+                                                <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{student.full_name}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">{student.roll_number}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">{student.email}</td>
                                                 </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {groupStudents.map((student) => (
-                                                    <tr key={student.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm font-bold text-gray-900">{student.full_name}</td>
-                                                        <td className="px-4 py-3 text-xs text-gray-500 font-mono">{student.roll_number}</td>
-                                                        <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[150px]" title={student.email}>{student.email}</td>
-                                                    </tr>
-                                                ))}
-                                                {groupStudents.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-sm italic">No students enrolled yet.</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            ))}
+                                            {groupStudents.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={3} className="px-6 py-12 text-center text-gray-400 text-sm italic">
+                                                        No students enrolled yet.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-
-                            {/* Lectures Column */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                        <Calendar className="w-5 h-5 text-[#1B3B6F]" /> 
-                                        Upcoming Lectures
-                                    </h3>
-                                    <button className="text-xs font-bold text-[#1B3B6F] hover:underline">+ Schedule</button>
-                                </div>
-                                <div className="space-y-3">
-                                    {groupLectures.map((lecture) => (
-                                        <div key={lecture.id} className="bg-white border border-gray-200 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
-                                            <div>
-                                                <h4 className="font-bold text-gray-900 text-sm">{lecture.title}</h4>
-                                                <div className="flex items-center gap-4 mt-2">
-                                                    <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
-                                                        <Calendar className="w-3 h-3" /> {lecture.date}
-                                                    </span>
-                                                    <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
-                                                        <Clock className="w-3 h-3" /> {lecture.time}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase justify-end">
-                                                    <MapPin className="w-3 h-3" /> {lecture.location}
-                                                </span>
-                                                <button className="mt-2 text-xs font-bold text-[#1B3B6F] border border-blue-100 px-3 py-1 rounded hover:bg-blue-50 transition-colors">
-                                                    Edit
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {groupLectures.length === 0 && (
-                                        <div className="bg-gray-50 border border-gray-100 border-dashed rounded-xl p-8 text-center text-gray-400 text-sm">
-                                            No upcoming lectures scheduled.
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                                    <div className="flex items-start gap-3">
-                                        <BookOpen className="w-5 h-5 text-[#1B3B6F] mt-0.5" />
-                                        <div>
-                                            <h4 className="font-bold text-[#1B3B6F] text-sm">Course Materials</h4>
-                                            <p className="text-xs text-blue-800/70 mt-1 mb-2">Manage syllabus, notes, and assignments.</p>
-                                            <button className="text-xs bg-white text-[#1B3B6F] px-3 py-1.5 rounded border border-blue-200 font-bold hover:bg-blue-50">
-                                                Go to Materials Drive
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
                     )}
                 </div>

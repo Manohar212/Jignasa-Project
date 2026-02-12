@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentGroups from './pages/StudentGroups';
+import StudentGroupDetails from './pages/StudentGroupDetails';
 import StudentStatistics from './pages/StudentStatistics';
 import StudentProfile from './pages/StudentProfile';
 import JoinLecture from './pages/JoinLecture';
@@ -54,6 +55,7 @@ const App: React.FC = () => {
               <Routes>
                 <Route path="dashboard" element={<StudentDashboard />} />
                 <Route path="groups" element={<StudentGroups />} />
+                <Route path="group/:id" element={<StudentGroupDetails />} />
                 <Route path="statistics" element={<StudentStatistics />} />
                 <Route path="profile" element={<StudentProfile />} />
                 <Route path="lecture/:id" element={<JoinLecture />} />

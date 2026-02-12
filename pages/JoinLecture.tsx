@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Video, Mic, ArrowRight, VideoOff, Camera, Wifi } from 'lucide-react';
+import { Video, Mic, ArrowRight, VideoOff, Camera, Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 
@@ -8,6 +8,7 @@ const JoinLecture: React.FC = () => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,6 +44,8 @@ const JoinLecture: React.FC = () => {
 
   const startSession = async () => {
     setPermissionError(null);
+    setConnectionError(null);
+    
     try {
         // 1. Get Camera Stream
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -58,18 +61,35 @@ const JoinLecture: React.FC = () => {
         // 2. Connect to WebSocket / Signaling Server
         connectToSignalingServer();
 
-    } catch (err) {
+    } catch (err: any) {
         console.error("Error accessing camera:", err);
-        setPermissionError("Camera/Microphone access denied. Please allow permissions to join.");
+        let errorMessage = "An unknown error occurred while accessing media devices.";
+
+        // Handle specific error types for better UX
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMessage = "Access denied. Please allow camera and microphone permissions in your browser settings.";
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            errorMessage = "No camera or microphone found. Please check your device connections.";
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            errorMessage = "Camera or microphone is already in use by another application.";
+        } else if (err.name === 'OverconstrainedError') {
+            errorMessage = "The requested device constraints could not be satisfied.";
+        } else if (err.name === 'TypeError') {
+            errorMessage = "Secure connection required (HTTPS) to access media devices.";
+        }
+
+        setPermissionError(errorMessage);
         setIsCameraActive(false);
     }
   };
 
   const connectToSignalingServer = () => {
       // Connect to the Flask-SocketIO backend
-      // Assuming backend runs on port 5000 locally or relative path in production
       const socket = io('http://localhost:5000', {
-          transports: ['websocket'],
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
           query: {
               role: 'student',
               lecture_id: id
@@ -81,18 +101,29 @@ const JoinLecture: React.FC = () => {
       socket.on('connect', () => {
           console.log(`Connected to signaling server for Lecture ${id}`);
           setIsConnected(true);
+          setConnectionError(null);
           // Join the specific lecture room
           socket.emit('join', { lecture_id: id, role: 'student' });
       });
 
-      socket.on('disconnect', () => {
-          console.log("Disconnected from signaling server");
+      socket.on('disconnect', (reason) => {
+          console.log("Disconnected from signaling server:", reason);
           setIsConnected(false);
+          if (reason === "io server disconnect") {
+              setConnectionError("Disconnected by server. Please refresh.");
+          } else {
+              setConnectionError("Connection lost. Reconnecting...");
+          }
       });
 
       socket.on('connect_error', (err) => {
-          console.error("Socket connection error:", err);
+          console.error("Socket connection error:", err.message);
           setIsConnected(false);
+          setConnectionError("Unable to reach server. Retrying...");
+      });
+
+      socket.on('reconnect_failed', () => {
+          setConnectionError("Failed to reconnect. Please check your internet connection.");
       });
   };
 
@@ -149,10 +180,10 @@ const JoinLecture: React.FC = () => {
                           })
                       });
                       
-                      const result = await response.json();
-                      
-                      // Optionally, emit the result via socket if needed for immediate peer updates
-                      // socketRef.current?.emit('emotion_update', result);
+                      // Handle non-200 responses if needed, but analysis failure shouldn't stop the stream
+                      if (!response.ok) {
+                          console.warn("Emotion analysis request failed:", response.statusText);
+                      }
                   } catch (error) {
                       console.error("Failed to send frame:", error);
                   }
@@ -198,10 +229,13 @@ const JoinLecture: React.FC = () => {
              ) : (
                  <>
                     {permissionError ? (
-                        <div className="text-center p-4">
+                        <div className="text-center p-4 max-w-md">
                             <VideoOff className="w-16 h-16 mb-4 text-red-400 mx-auto" />
-                            <p className="font-medium text-red-500">{permissionError}</p>
-                            <button onClick={startSession} className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold hover:bg-red-200">Retry Permission</button>
+                            <p className="font-bold text-red-600 mb-2">Camera Access Error</p>
+                            <p className="font-medium text-sm text-gray-600 mb-4">{permissionError}</p>
+                            <button onClick={startSession} className="px-6 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold hover:bg-red-200 transition-colors">
+                                Retry Permission
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -216,9 +250,22 @@ const JoinLecture: React.FC = () => {
              {/* Status Overlay */}
              {isCameraActive && (
                  <>
-                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-                        <span className="text-xs font-bold text-white">{isConnected ? 'LIVE' : 'CONNECTING...'}</span>
+                    <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
+                        {/* Connection Status Badge */}
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/10 shadow-sm ${isConnected ? 'bg-black/50' : 'bg-red-500/80'}`}>
+                            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-white'}`}></div>
+                            <span className="text-xs font-bold text-white">
+                                {isConnected ? 'LIVE' : connectionError ? 'OFFLINE' : 'CONNECTING...'}
+                            </span>
+                        </div>
+                        
+                        {/* Error Toast */}
+                        {!isConnected && connectionError && (
+                            <div className="bg-red-50/90 text-red-700 px-3 py-2 rounded-lg text-xs font-bold shadow-sm max-w-[200px] text-right flex items-center gap-2 border border-red-100 animate-in slide-in-from-top-2">
+                                <WifiOff className="w-3 h-3 shrink-0" />
+                                {connectionError}
+                            </div>
+                        )}
                     </div>
 
                     <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
@@ -265,10 +312,10 @@ const JoinLecture: React.FC = () => {
              </button>
          ) : (
              <button 
-                className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg cursor-default shadow-lg flex items-center justify-center gap-2"
+                className={`flex-1 py-4 text-white rounded-xl font-bold text-lg cursor-default shadow-lg flex items-center justify-center gap-2 transition-colors ${isConnected ? 'bg-green-600' : 'bg-yellow-500'}`}
              >
-                <Wifi className="w-5 h-5 animate-pulse" />
-                Streaming...
+                {isConnected ? <Wifi className="w-5 h-5 animate-pulse" /> : <AlertCircle className="w-5 h-5" />}
+                {isConnected ? 'Streaming...' : 'Reconnecting...'}
              </button>
          )}
          
